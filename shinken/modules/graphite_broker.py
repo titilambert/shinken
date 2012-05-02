@@ -120,7 +120,13 @@ class Graphite_broker(BaseModule):
             return
         
         hname = self.illegal_char.sub('_', data['host_name'])
+        if '_GRAPHITE_PRE' in data:
+            hname = ".".join((data['_GRAPHITE_PRE'], hname))
+
         desc = self.illegal_char.sub('_', data['service_description'])
+        if '_GRAPHITE_POST' in data:
+            desc = ".".join((desc, data['_GRAPHITE_POST']))
+
         check_time = int(data['last_chk'])
 
 #        print "Graphite:", hname, desc, check_time, perf_data
@@ -147,6 +153,9 @@ class Graphite_broker(BaseModule):
             return
         
         hname = self.illegal_char.sub('_', data['host_name'])
+        if '_GRAPHITE_PRE' in data:
+            hname = ".".join((data['_GRAPHITE_PRE'], hname))
+
         check_time = int(data['last_chk'])
 
  #       print "Graphite:", hname, check_time, perf_data
