@@ -115,7 +115,7 @@ class Log:
         else:
             s = format % message
 
-        if print_it and len(s) > 1:
+        if len(s) > 1:
             # If the daemon is launched with a non UTF8 shell
             # we can have problems in printing
             try:
