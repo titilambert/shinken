@@ -31,9 +31,17 @@ from shinken.misc.regenerator import Regenerator
 from shinken.util import safe_print, get_obj_full_name
 
 
-def itersorted(self):
-    for _, hid in self._id_heap:
-        yield self.items[hid]
+def itersorted(self, authuser=None):
+    if authuser and authuser in self._id_contact_heap:
+        # return only items belonging to this contact
+        for _, hid in self._id_contact_heap[authuser]:
+            yield self.items[hid]
+    elif not authuser:
+        # return all items
+        for _, hid in self._id_heap:
+            yield self.items[hid]
+    # if authuser and authuser not in self._id_contact_heap:
+    # we do nothing, so the caller gets an empty list
 
 
 class LiveStatusRegenerator(Regenerator):
@@ -65,6 +73,29 @@ class LiveStatusRegenerator(Regenerator):
         setattr(self.servicegroups, '__itersorted__', types.MethodType(itersorted, self.servicegroups))
         setattr(self.hostgroups, '__itersorted__', types.MethodType(itersorted, self.hostgroups))
         setattr(self.contactgroups, '__itersorted__', types.MethodType(itersorted, self.contactgroups))
+
+        # Speedup authUser requests by populating _id_contact_heap with contact-names as key and 
+        # an array with the associated service ids
+        setattr(self.hosts, '_id_contact_heap', dict())
+        [self.hosts._id_contact_heap.setdefault(c, []).append((get_obj_full_name(v), k)) for (k, v) in self.hosts.items.iteritems() for c in v.contacts]
+        for c in self.hosts._id_contact_heap.keys():
+            self.hosts._id_contact_heap[c].sort(key=lambda x: x[0])
+
+        setattr(self.services, '_id_contact_heap', dict())
+        # strict: one must be an explicity contact of a service in order to see it.
+        # if self.service_authorization_strict:
+        [self.services._id_contact_heap.setdefault(c, []).append((get_obj_full_name(v), k)) for (k, v) in self.services.items.iteritems() for c in v.contacts]
+        for c in self.services._id_contact_heap.keys():
+            self.services._id_contact_heap[c].sort(key=lambda x: x[0])
+        # todo loose: loop through hosts
+        # if host contact -> all services
+        # if not host contact -> services where one is contact
+
+        setattr(self.hostgroups, '_id_contact_heap', dict())
+        setattr(self.servicegroups, '_id_contact_heap', dict())
+        # if self.group_authorization_strict:
+        # todo strict: a contact must be contact of _all_ members 
+        # todo loose: a contact of a member becomes contact of the whole group
 
         # Everything is new now. We should clean the cache
         self.cache.wipeout()

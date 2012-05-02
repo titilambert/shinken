@@ -38,7 +38,6 @@ from shinken.daemon import Daemon, Interface
 from shinken.log import logger
 from shinken.brok import Brok
 from shinken.external_command import ExternalCommand
-from shinken.util import safe_print
 
 # Interface for the other Arbiter
 # It connects, and together we decide who's the Master and who's the Slave, etc.
@@ -64,10 +63,10 @@ class IForArbiter(Interface):
     def do_not_run(self):
         # If i'm the master, then F**K YOU!
         if self.app.is_master:
-            print "Some f***ing idiot asks me not to run. I'm a proud master, so I decide to run anyway"
+            logger.debug("Some f***ing idiot asks me not to run. I'm a proud master, so I decide to run anyway")
         # Else, I'm just a spare, so I listen to my master
         else:
-            print "Someone asks me not to run"
+            logger.debug("Someone asks me not to run")
             self.app.last_master_speack = time.time()
             self.app.must_run = False
 
@@ -117,10 +116,9 @@ class IForArbiter(Interface):
 
     # Try to give some properties of our objects
     def get_objects_properties(self, table, *properties):
-        print 'ASK::', table
-        print 'ASK:', properties
+        logger.debug('ASK:: table= %s, properties= %s' % (str(table), str(properties)))
         objs = getattr(self.app.conf, table, None)
-        print "OBJS", objs
+        logger.debug("OBJS:: %s" % str(objs))
         if not objs :
             return ''
         res = []
@@ -237,12 +235,12 @@ class Arbiter(Daemon):
 
 
     def load_config_file(self):
-        print "Loading configuration"
+        logger.debug("Loading configuration")
         # REF: doc/shinken-conf-dispatching.png (1)
         buf = self.conf.read_config(self.config_files)
         raw_objects = self.conf.read_config_buf(buf)
 
-        print "Opening local log file"
+        logger.debug("Opening local log file")
 
 
         # First we need to get arbiters and modules
@@ -258,7 +256,7 @@ class Arbiter(Daemon):
                 arb.need_conf = False
                 self.me = arb
                 self.is_master = not self.me.spare
-                logger.info("I am the %s Arbiter : %s" % ('master' if self.is_master else 'spare', arb.get_name()))
+                logger.info("I am the %s Arbiter : %s" % (('master', 'spare')[self.is_master], arb.get_name()))
 
                 # Set myself as alive ;)
                 self.me.alive = True
@@ -290,7 +288,7 @@ class Arbiter(Daemon):
                 try :
                     r = inst.get_objects()
                 except Exception, exp:
-                    print "The instance %s raise an exception %s. I bypass it" % (inst.get_name(), str(exp))
+                    logger.debug("The instance %s raise an exception %s. I bypass it" % (inst.get_name(), str(exp)))
                     continue
                 
                 types_creations = self.conf.types_creations
@@ -303,7 +301,7 @@ class Arbiter(Daemon):
                                 raw_objects[k] = []
                             # now append the object
                             raw_objects[k].append(x)
-                        print "Added %i objects to %s from module %s" % (len(r[prop]), k, inst.get_name())
+                        logger.debug("Added %i objects to %s from module %s" % (len(r[prop]), k, inst.get_name()))
 
 
         ### Resume standard operations ###
@@ -399,7 +397,7 @@ class Arbiter(Daemon):
         #    sys.exit("Configuration is incorrect, sorry, I bail out")
 
         # REF: doc/shinken-conf-dispatching.png (2)
-        logger.info("Cutting the hosts and services into parts")
+        logger.info("Cutting the hosts and services into parts", print_it=True)
         self.confs = self.conf.cut_into_parts()
 
         # The conf can be incorrect here if the cut into parts see errors like
@@ -408,7 +406,7 @@ class Arbiter(Daemon):
             self.conf.show_errors()
             sys.exit("Configuration is incorrect, sorry, I bail out")
 
-        logger.info('Things look okay - No serious problems were detected during the pre-flight check')
+        logger.info('Things look okay - No serious problems were detected during the pre-flight check', print_it=True)
 
         # Clean objects of temporary/unecessary attributes for live work:
         self.conf.clean()
@@ -447,8 +445,7 @@ class Arbiter(Daemon):
         self.host = self.me.address
         self.port = self.me.port
         
-        logger.info("Configuration Loaded")
-        print ""
+        logger.info("Configuration Loaded", print_it=True)
 
 
     # Main loop function
@@ -505,7 +502,7 @@ class Arbiter(Daemon):
             if not self.new_conf:
                 return
             self.setup_new_conf()
-            print "I must wait now"
+            logger.debug("I must wait now")
             self.wait_for_master_death()
 
         if self.must_run:
@@ -580,7 +577,7 @@ class Arbiter(Daemon):
         for sched in self.conf.schedulers:
             cmds = sched.external_commands
             if len(cmds) > 0 and sched.alive:
-                safe_print("Sending %d commands" % len(cmds), 'to scheduler', sched.get_name())
+                logger.debug("Sending %d commands to scheduler %s" % (len(cmds), sched.get_name()))
                 sched.run_external_commands(cmds)
             # clean them
             sched.external_commands = []
@@ -621,7 +618,7 @@ class Arbiter(Daemon):
         e.load_arbiter(self)
         self.external_command = e
 
-        print "Run baby, run..."
+        logger.debug("Run baby, run...")
         timeout = 1.0             
         
         while self.must_run and not self.interrupted:
@@ -682,7 +679,7 @@ class Arbiter(Daemon):
             # send_conf_to_schedulers()
             
             if self.nb_broks_send != 0:
-                print "Nb Broks send:", self.nb_broks_send
+                logger.debug("Nb Broks send: %d" % self.nb_broks_send)
             self.nb_broks_send = 0
 
             self.push_external_commands_to_schedulers()

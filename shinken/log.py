@@ -28,6 +28,7 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 
 from brok import Brok
+from util import if_else
 
 obj = None
 name = None
@@ -85,7 +86,7 @@ class Log:
         """Old log method, kept for NAGIOS compatibility"""
         self._log(logging.INFO, message, format, print_it, display_level=False)
 
-    def _log(self, level, message, format=None, print_it=True, display_level=True):
+    def _log(self, level, message, format=None, print_it=False, display_level=True):
         """We enter a log message, we format it, and we add the log brok"""
         global obj
         global name
@@ -103,21 +104,15 @@ class Log:
         if format is None:
             lvlname = logging.getLevelName(level)
 
-            fmt  = u'[%%(date)s] %s%%(name)s%%(msg)s\n' % ('%(level)s : ' if display_level else '')
-            #print "fmt", fmt, lvlname
+            fmt = u'[%%(date)s] %s%%(name)s%%(msg)s\n' % (if_else(display_level, '%(level)s : ', ''))
             args = {
-                'date' : time.asctime(time.localtime(time.time())) if human_timestamp_log 
-                    else int(time.time()),
+                'date' : if_else(human_timestamp_log, time.asctime(time.localtime(time.time())), int(time.time())),
                 'level': lvlname.capitalize(),
-                'name' : '' if name is None else '[%s] ' % name,
+                'name' : if_else(name is None, '', '[%s] ' % name),
                 'msg'  : message
             }
-
             s = fmt % args
-            #print "S is", s
-
         else:
-            print format, '::', message
             s = format % message
 
         if print_it and len(s) > 1:
@@ -129,9 +124,12 @@ class Log:
                 print s.encode('ascii', 'ignore')
 
 
-        # We create and add the brok
-        b = Brok('log', {'log': s})
-        obj.add(b)
+        # We create and add the brok but not for debug that don't need
+        # to do a brok for it, and so go in all satellites. Debug
+        # should keep locally
+        if level != logging.DEBUG:
+            b = Brok('log', {'log': s})
+            obj.add(b)
 
         # If we want a local log write, do it
         if local_log is not None:
@@ -168,7 +166,7 @@ class Log:
         """Close the local log file at program exit"""
         global local_log
         if local_log:
-            print "Closing local_log ..", local_log
+            self.debug("Closing %s local_log" % str(local_log))
             local_log.close()
 
 
