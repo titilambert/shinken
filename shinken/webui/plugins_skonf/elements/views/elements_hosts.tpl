@@ -1,16 +1,16 @@
 
-%rebase layout_skonf globals(), css=['objects/css/hosts.css'], js=['objects/js/hosts.js']
+%rebase layout_skonf globals(), css=['elements/css/hosts.css'], js=['elements/js/hosts.js']
 
 
 <div class='span2 pull-right'>
-  <a class='btn btn-info' href="/objects/add/host"><i class="icon-plus"></i> Add new host</a>
+  <a class='btn btn-info' href="/elements/add/host"><i class="icon-plus"></i> Add new host</a>
 </div>
 
 <div class='offset1 span10'>
   <h3>All your hosts</h3>
   %for h in elts:
   <div class='object_{{elt_type}} span12'>
-    <div class='host_name cut-long pull-left'><a href='/objects/hosts/{{h.get_name()}}'>{{h.get_name()}}</a></div>
+    <div class='host_name cut-long pull-left'><a href='/elements/hosts/{{h.get_name()}}'>{{h.get_name()}}</a></div>
     <div class='display_name cut-long pull-left'>{{getattr(h, 'display_name', '')}}&nbsp;</div>
     <div class='address cut-long pull-left'>{{getattr(h, 'address', '')}}&nbsp;</div>
     <div class='realm cut-long pull-left'>{{getattr(h, 'realm', '')}}&nbsp;</div>
@@ -34,7 +34,7 @@
 	<a id='btn-disabled-{{h.get_name()}}' class='{{disa_state}} btn btn-small btn-warning' href="javascript:enable_host('{{h.get_name()}}')">Disabled</a>
     </div>
     <br/>
-    <!--{{h}} {{h.host_name}} {{h.customs}}-->
+    <!--{{h}} -->
   </div>
   %end
 </div>
