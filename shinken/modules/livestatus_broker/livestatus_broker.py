@@ -65,7 +65,7 @@ class LiveStatus_broker(BaseModule, Daemon):
         # We can be in a scheduler. If so, we keep a link to it to speed up regnerator phase
         self.scheduler = None
         self.plugins = []
-        self.use_threads = (getattr(modconf, 'use_threads', '0') == 1)
+        self.use_threads = (getattr(modconf, 'use_threads', '0') == '1')
         self.host = getattr(modconf, 'host', '127.0.0.1')
         if self.host == '*':
             self.host = '0.0.0.0'
@@ -275,9 +275,15 @@ class LiveStatus_broker(BaseModule, Daemon):
                 # For updating, we cannot do it while
                 # answer queries, so wait for no readers
                 self.wait_for_no_readers()
+                self.global_lock.acquire()
                 try:
                     #print "Got data lock, manage brok"
-                    self.rg.manage_brok(b)
+                    manager = 'manage_' + b.type + '_brok'
+                    if hasattr(self, manager):
+                        getattr(self, manager)(b)
+                    else:
+                        self.rg.manage_brok(b)
+
                     for mod in self.modules_manager.get_internal_instances():
                         try:
                             mod.manage_brok(b)
@@ -287,6 +293,9 @@ class LiveStatus_broker(BaseModule, Daemon):
                             logger.debug("[%s] Exception type : %s" % (self.name, type(exp)))
                             logger.debug("Back trace of this kill: %s" % (traceback.format_exc()))
                             self.modules_manager.set_to_restart(mod)
+
+                    self.nb_writers -= 1
+                    self.global_lock.release()
                 except Exception, exp:
                     msg = Message(id=0, type='ICrash', data={
                         'name': self.get_name(),
@@ -317,6 +326,7 @@ class LiveStatus_broker(BaseModule, Daemon):
     # It will say if we can launch a page rendering or not.
     # We can only if there is no writer running from now
     def wait_for_no_writers(self):
+        start = time.time()
         while True:
             self.global_lock.acquire()
             # We will be able to run
@@ -330,6 +340,9 @@ class LiveStatus_broker(BaseModule, Daemon):
             # Before checking again, we should wait a bit
             # like 1ms
             time.sleep(0.001)
+            if time.time() - start > 30:
+                print "WARNING: we are in lock/read since more than 30s!!"
+                start = time.time()
 
 
     # It will say if we can launch a brok management or not
@@ -352,7 +365,7 @@ class LiveStatus_broker(BaseModule, Daemon):
             # We should warn if we cannot update broks
             # for more than 30s because it can be not good
             if time.time() - start > 30:
-                print "WARNING: we are in lock/read since more than 30s!"
+                print "WARNING: we are in lock/read since more than 30s!!"
                 start = time.time()
 
 
@@ -423,12 +436,13 @@ class LiveStatus_broker(BaseModule, Daemon):
         while not self.interrupted:
             if self.use_threads:
                 self.wait_for_no_writers()
+                self.global_lock.acquire()
                 self.livestatus.counters.calc_rate()
             else:
                 try:
+                    # Un-serialize the brok data
                     l = self.to_q.get(True, .01)
                     for b in l:
-                        # Un-serialize the brok data
                         b.prepare()
                         self.rg.manage_brok(b)
                         for mod in self.modules_manager.get_internal_instances():
@@ -520,6 +534,7 @@ class LiveStatus_broker(BaseModule, Daemon):
                 pass
 
             if len(inputready) > 0:
+                print inputready
                 for s in inputready:
                 # We will identify sockets by their filehandle number
                 # during the rest of this loop
@@ -659,6 +674,7 @@ class LiveStatus_broker(BaseModule, Daemon):
                             # Register this socket for deletion
                             kick_connections.append(s.fileno())
 
+                print "for socketid in open_connections:"
                 # Now the work is done. Cleanup
                 for socketid in open_connections:
                     print "connection %d is idle since %d seconds (%s)\n" % (socketid, now - open_connections[socketid]['lastseen'], open_connections[socketid]['state'])
@@ -668,6 +684,7 @@ class LiveStatus_broker(BaseModule, Daemon):
                         open_connections[socketid]['state'] = 'idle'
                         kick_connections.append(socketid)
 
+                print "for socketid in kick_connections:"
                 # Close connections which timed out or are no longer needed
                 for socketid in kick_connections:
                     kick_socket = None
@@ -687,9 +704,32 @@ class LiveStatus_broker(BaseModule, Daemon):
                             self.input.remove(kick_socket)
                             print "closed socket", socketid
 
+            if self.use_threads:
+                self.nb_readers -= 1
+                self.global_lock.release()
+
         self.do_stop()
 
     def write_protocol(self, request, response):
-        if self.debug_queries:
+#        if self.debug_queries:
             print "REQUEST>>>>>\n" + request + "\n\n"
-            print "RESPONSE<<<<\n" + response + "\n\n"
+#            print "RESPONSE<<<<\n" + response + "\n\n"
+
+    def manage_update_program_status_brok(self, b):
+        data = b.data
+        c_id = data['instance_id']
+
+        # If we got an update about an unknow isntance, cry and ask for a full
+        # version!
+        if not c_id in self.rg.configs.keys():
+            # Do not ask data too quickly, very dangerous
+            # one a minute
+            if time.time() - self.rg.last_need_data_send > 60:
+                msg = Message(id=0, type='NeedData', data={'full_instance_id' : c_id})
+                self.from_q.put(msg)
+                self.rg.last_need_data_send = time.time()
+            return
+
+        # Ok, good conf, we can update it
+        c = self.rg.configs[c_id]
+        self.rg.update_element(c, data)

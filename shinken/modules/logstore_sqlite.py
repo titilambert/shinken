@@ -125,7 +125,7 @@ class LiveStatusLogStoreSqlite(BaseModule):
 
     def open(self):
         print "open LiveStatusLogStoreSqlite ok"
-        self.dbconn = sqlite3.connect(self.database_file)
+        self.dbconn = sqlite3.connect(self.database_file, check_same_thread=False)
         # Get no problem for utf8 insert
         self.dbconn.text_factory = str
         self.dbcursor = self.dbconn.cursor()
@@ -214,8 +214,13 @@ class LiveStatusLogStoreSqlite(BaseModule):
         """
         try:
             dbresult = self.execute('SELECT MIN(time),MAX(time) FROM logs')
-            mintime = dbresult[0][0]
-            maxtime = dbresult[0][1]
+            dbresult = [r for r in dbresult if r]
+            try:
+                mintime = dbresult[0][0]
+                maxtime = dbresult[0][1]
+            except IndexError, e:
+                mintime = int(time.time())
+                maxtime = int(time.time())
         except sqlite3.Error, e:
             print "An error occurred:", e.args[0]
         if mintime is None:
@@ -416,8 +421,8 @@ class LiveStatusLogStoreSqlite(BaseModule):
     def get_live_data_log(self):
         """Like get_live_data, but for log objects"""
         # finalize the filter stacks
-	#self.sql_time_filter_stack.and_elements(self.sql_time_filter_stack.qsize())
-	self.sql_filter_stack.and_elements(self.sql_filter_stack.qsize())
+        #self.sql_time_filter_stack.and_elements(self.sql_time_filter_stack.qsize())
+        self.sql_filter_stack.and_elements(self.sql_filter_stack.qsize())
         if self.use_aggressive_sql:
             # Be aggressive, get preselected data from sqlite and do less
             # filtering in python. But: only a subset of Filter:-attributes
