@@ -39,7 +39,8 @@ def itersorted(self, authuser=None):
     elif not authuser:
         # return all items
         for _, hid in self._id_heap:
-            yield self.items[hid]
+            if hid in self.items:
+                yield self.items[hid]
     # if authuser and authuser not in self._id_contact_heap:
     # we do nothing, so the caller gets an empty list
 
@@ -73,6 +74,8 @@ class LiveStatusRegenerator(Regenerator):
         self.hostgroups._id_heap.sort(key=lambda x: x[0])
         setattr(self.contactgroups, '_id_heap', [(get_obj_full_name(v), k) for (k, v) in self.contactgroups.items.iteritems()])
         self.contactgroups._id_heap.sort(key=lambda x: x[0])
+        setattr(self.commands, '_id_heap', [(get_obj_full_name(v), k) for (k, v) in self.commands.items.iteritems()])
+        self.commands._id_heap.sort(key=lambda x: x[0])
         # Then install a method for accessing the lists' elements in sorted order
         setattr(self.services, '__itersorted__', types.MethodType(itersorted, self.services))
         setattr(self.hosts, '__itersorted__', types.MethodType(itersorted, self.hosts))
@@ -80,6 +83,7 @@ class LiveStatusRegenerator(Regenerator):
         setattr(self.servicegroups, '__itersorted__', types.MethodType(itersorted, self.servicegroups))
         setattr(self.hostgroups, '__itersorted__', types.MethodType(itersorted, self.hostgroups))
         setattr(self.contactgroups, '__itersorted__', types.MethodType(itersorted, self.contactgroups))
+        setattr(self.commands, '__itersorted__', types.MethodType(itersorted, self.commands))
 
         # Speedup authUser requests by populating _id_contact_heap with contact-names as key and 
         # an array with the associated service ids

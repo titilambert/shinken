@@ -30,6 +30,7 @@ import traceback
 import cStringIO
 import sys
 import socket
+import threading
 from Queue import Empty
 
 try:
@@ -1484,6 +1485,17 @@ class Scheduler:
             # Ok, go to send our broks to our external modules
             #self.send_broks_to_modules()
 
+#            if not hasattr(self, 'handled_requests'):
+#                self.handled_requests = StoppableThread(target=self.sched_daemon.handleRequests, args=(1.0, None, True))
+#            if not self.handled_requests.is_alive():
+#                print "STARTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+#                print self.handled_requests.is_alive()
+#                print self.handled_requests.isAlive()
+#                try:
+#                    self.handled_requests.start()
+#                except RuntimeError, e:
+#                    pass
+            
             elapsed, _, _ = self.sched_daemon.handleRequests(timeout)
             if elapsed: 
                 timeout -= elapsed
@@ -1556,4 +1568,21 @@ class Scheduler:
         # WE must save the retention at the quit BY OURSELF
         # because our daemon will not be able to do it for us
         self.update_retention_file(True)
-            
+
+        if hasattr(self, 'handled_requests'):
+            self.handled_requests.stop()
+
+
+class StoppableThread(threading.Thread):
+    """Thread class with a stop() method. The thread itself has to check
+    regularly for the stopped() condition."""
+
+    def __init__(self, target, args):
+        super(StoppableThread, self).__init__(target=target, args=args)
+        self._stop = threading.Event()
+
+    def stop(self):
+        self._stop.set()
+
+    def stopped(self):
+        return self._stop.isSet()

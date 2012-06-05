@@ -28,6 +28,7 @@ import os
 import time
 import traceback
 import cPickle
+import threading
 
 from shinken.scheduler import Scheduler
 from shinken.macroresolver import MacroResolver
@@ -106,8 +107,15 @@ HE got user entry, so we must listen him carefully and give information he want,
         self.app.sched.run_external_commands(cmds)
 
     def put_conf(self, conf):
-        self.app.sched.die()
+        self.t_new_conf = threading.Thread(target=self._process_new_conf, args=(conf,))
+        self.t_new_conf.start()
+
+    def _process_new_conf(self, conf):
         super(IForArbiter, self).put_conf(conf)
+        logger.debug("Ok we've got conf")
+        self.app.setup_new_conf()
+        self.app.sched.die()
+
 
     #Call by arbiter if it thinks we are running but we must do not (like
     #if I was a spare that take a conf but the master returns, I must die
@@ -244,13 +252,14 @@ class Shinken(BaseSatellite):
 
     def do_loop_turn(self):        
         # Ok, now the conf
-        self.wait_for_initial_conf()
-        if not self.new_conf:
-            return
-        logger.debug("Ok we've got conf")
-        self.setup_new_conf()
+        if (self.sched.must_run and not self.cur_conf and not self.new_conf):
+            self.wait_for_initial_conf()
         logger.debug("Configuration Loaded")
-        self.sched.run()
+        self.sched.must_run = True
+        try:
+            self.sched.run()
+        except:
+            print "TRY AGAIN !!!!"
 
 
     def setup_new_conf(self):
@@ -266,8 +275,6 @@ class Shinken(BaseSatellite):
         t0 = time.time()
         conf = cPickle.loads(conf_raw)
         logger.debug("Conf received at %d. Unserialized in %d secs" % (t0, time.time() - t0))
-
-        self.new_conf = None
 
         # Tag the conf with our data
         self.conf = conf
@@ -391,4 +398,34 @@ class Shinken(BaseSatellite):
             logger.critical("Back trace of it: %s" % (traceback.format_exc()))
             raise
             
-            
+    def DISABLE_handleRequests(self, timeout, suppl_socks=None, daemon=False):
+        while True:
+            time.sleep(0.01)
+            if suppl_socks is None:
+                suppl_socks = []
+            before = time.time()
+            socks = self.pyro_daemon.get_sockets()
+            if suppl_socks:
+                socks.extend(suppl_socks)
+            ins = self.get_socks_activity(socks, timeout)
+            tcdiff = self.check_for_system_time_change()
+            before += tcdiff
+            # Increase our sleep time for the time go in select
+            self.sleep_time += time.time() - before
+            if len(ins) == 0: # trivial case: no fd activity:
+                if daemon:
+                    continue
+                else:
+                    return 0, [], tcdiff
+            for sock in socks:
+                if sock in ins and sock not in suppl_socks:
+                    self.pyro_daemon.handleRequests(sock)
+                    ins.remove(sock)
+            # Tack in elapsed the WHOLE time, even with handling requests
+            elapsed = time.time() - before
+            if elapsed == 0: # we have done a few instructions in 0 second exactly !? quantum computer ?
+                elapsed = 0.01  # but we absolutely need to return != 0 to indicate that we got activity
+
+            if not daemon:
+                return elapsed, ins, tcdiff
+

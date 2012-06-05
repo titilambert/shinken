@@ -73,6 +73,7 @@ class Log:
         logging.getLogger().setLevel(level)
 
     def debug(self, msg, *args, **kwargs):
+        print "DEBUG:", msg
         self._log(logging.DEBUG, msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):

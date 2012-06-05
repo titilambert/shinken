@@ -435,8 +435,8 @@ class LiveStatus_broker(BaseModule, Daemon):
 
         while not self.interrupted:
             if self.use_threads:
-                self.wait_for_no_writers()
-                self.global_lock.acquire()
+            #    self.wait_for_no_writers()
+            #    self.global_lock.acquire()
                 self.livestatus.counters.calc_rate()
             else:
                 try:
@@ -462,7 +462,8 @@ class LiveStatus_broker(BaseModule, Daemon):
                 except Exception, exp:
                     print "Error : got an exeption (bad code?)", exp, exp.__dict__, type(exp)
                     raise
-                time.sleep(0.01)
+
+            time.sleep(0.01)
 
             # Commit log broks to the database
             self.db.commit_and_rotate_log_db()
@@ -474,6 +475,7 @@ class LiveStatus_broker(BaseModule, Daemon):
             if True:
                 # It's True, this is a horrible implementation
                 # It doesn't use triggers yet, so it may be very slow.
+#                def process_socket(socketid):
                 for socketid in open_connections:
                     if open_connections[socketid]['state'] == 'waiting' and now > open_connections[socketid]['nexttry']:
                         wait = open_connections[socketid]['wait']
@@ -528,13 +530,21 @@ class LiveStatus_broker(BaseModule, Daemon):
                             # This one has no timeout, so try forever
                             pass
 
+#                socket_threads = []
+#                for socketid in open_connections:
+#                    ps = threading.Thread(None, process_socket, 'ps_%s' % socketid, args=(socketid,))
+#                    ps.start()
+#                    socket_threads.append(ps)
+#
+#                for ps in socket_threads:
+#                    ps.join()
+
             # At the end of this loop we probably will discard connections
             kick_connections = []
             if len(exceptready) > 0:
                 pass
 
             if len(inputready) > 0:
-                print inputready
                 for s in inputready:
                 # We will identify sockets by their filehandle number
                 # during the rest of this loop
@@ -674,7 +684,6 @@ class LiveStatus_broker(BaseModule, Daemon):
                             # Register this socket for deletion
                             kick_connections.append(s.fileno())
 
-                print "for socketid in open_connections:"
                 # Now the work is done. Cleanup
                 for socketid in open_connections:
                     print "connection %d is idle since %d seconds (%s)\n" % (socketid, now - open_connections[socketid]['lastseen'], open_connections[socketid]['state'])
@@ -684,7 +693,6 @@ class LiveStatus_broker(BaseModule, Daemon):
                         open_connections[socketid]['state'] = 'idle'
                         kick_connections.append(socketid)
 
-                print "for socketid in kick_connections:"
                 # Close connections which timed out or are no longer needed
                 for socketid in kick_connections:
                     kick_socket = None
@@ -704,9 +712,9 @@ class LiveStatus_broker(BaseModule, Daemon):
                             self.input.remove(kick_socket)
                             print "closed socket", socketid
 
-            if self.use_threads:
-                self.nb_readers -= 1
-                self.global_lock.release()
+#            if self.use_threads:
+#                self.nb_readers -= 1
+#                self.global_lock.release()
 
         self.do_stop()
 

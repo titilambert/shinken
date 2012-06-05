@@ -516,11 +516,6 @@ Like temporary attributes such as "imported_from", etc.. """
                 if brok_type in entry.fill_brok:
                     data[prop] = self.get_property_value_for_brok(prop, cls.running_properties)
 
-        if hasattr(cls, 'customs'):
-            data.update(self.customs)
-            if hasattr(self, 'host'):
-                data.update(self.host.customs)
-
 
     # Get a brok with initial status
     def get_initial_status_brok(self):

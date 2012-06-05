@@ -517,10 +517,13 @@ class Broker(BaseSatellite):
         # Dump modules Queues size
         insts = [ inst for inst in self.modules_manager.instances if inst.is_external]
         for inst in insts:
-            try:
-                logger.debug("External Queue len (%s) : %s" % (inst.get_name(), inst.to_q.qsize()))
-            except Exception, exp:
-                logger.debug("External Queue len (%s) : Exception! %s" % (inst.get_name(), exp))
+        #    if not inst.to_q is None:
+                try:
+                    logger.debug("External Queue len (%s) : %s" % (inst.get_name(), inst.to_q.qsize()))
+                except Exception, exp:
+                    logger.debug("External Queue len (%s) : Exception! %s" % (inst.get_name(), exp))
+        #    else:
+        #        logger.debug("External Queue len (%s) is NONE" % (inst.get_name(), ))
 
 
         # Begin to clean modules

@@ -21,15 +21,18 @@
 TESTLIST=$1
 COVERAGE=$2
 PYLINT=$3
+PEP8=$4
 TESTLIST=$(readlink -f $TESTLIST)
+
+. env/bin/activate
+
 test "$COVERAGE" == "COVERAGE" || COVERAGE="NOCOVERAGE"
 test "$PYLINT" == "PYLINT" || PYLINT="NOPYLINT"
+test "$PEP8" == "PEP8" || PYLINT="NOPEP8"
 test "$PYTHONVERS" == "" && PYTHONVERS=27
 test "$PYTHONVERS" == "27" && PYTHONVERS=2.7.1
 test "$PYTHONVERS" == "26" && PYTHONVERS=2.6.6
 test "$PYTHONVERS" == "24" && PYTHONVERS=2.4.6
-PYTHONBIN=${PYTHONBIN:-/opt/python-${PYTHONVERS}/bin/python}
-PYTHONTOOLS=${PYTHONTOOLS:-/opt/python-${PYTHONVERS}/bin}
 
 
 DIR=$(cd $(dirname "$0"); pwd)
@@ -44,9 +47,9 @@ test $COVERAGE == "COVERAGE" && rm -f .coverage
 function launch_and_assert {
     SCRIPT=$1
     if test $COVERAGE == "NOCOVERAGE"; then
-      ${PYTHONTOOLS}/nosetests -v -s --with-xunit ./$SCRIPT
+      nosetests -v -s --with-xunit ./$SCRIPT --xunit-file=TEST-$SCRIPT.xml
     else
-      ${PYTHONTOOLS}/nosetests -v -s --with-xunit --with-coverage ./$SCRIPT
+      nosetests -v -s --with-xunit --with-coverage ./$SCRIPT --xunit-file=TEST-$SCRIPT.xml
     fi
     if [ $? != 0 ]
 	then
@@ -70,15 +73,24 @@ done < $TESTLIST
 # Create the coverage file
 if test $COVERAGE == "COVERAGE"; then
   echo merging coverage files
-  ${PYTHONTOOLS}/coverage xml --omit=/usr/lib
-fi
-if test $PYLINT == "PYLINT"; then
-  cd ..
-  echo checking the code with pylint
-  ${PYTHONTOOLS}/pylint --rcfile test/jenkins/pylint.rc shinken > pylint.txt
+  coverage xml
+  coverage html
 fi
 
-if test $COVERAGE == "COVERAGE" && test $PYLINT == "PYLINT"; then
+cd ..
+
+if test $PYLINT == "PYLINT"; then
+  echo checking the code with pylint
+  pylint --rcfile test/jenkins/pylint.rc shinken > pylint.txt
+fi
+
+if test $PEP8 == "PEP8"; then
+  echo checking the code with pep8
+  pep8 shinken > pep8.txt
+fi
+
+
+if test $COVERAGE == "COVERAGE" && test $PYLINT == "PYLINT" && test $PEP8 == "PEP8"; then
   # this run's purpose was to collect metrics, so let jenkins think, it's ok
   exit 0
 fi

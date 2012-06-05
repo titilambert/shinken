@@ -31,6 +31,7 @@ from mapping import table_class_map, find_filter_converter, list_livestatus_attr
 from livestatus_response import LiveStatusResponse
 from livestatus_stack import LiveStatusStack
 from livestatus_constraints import LiveStatusConstraints
+from itertools import groupby
 
 
 class LiveStatusQueryError(Exception):
@@ -173,10 +174,11 @@ class LiveStatusQuery(object):
                     # the desired operation
                     self.filtercolumns.append(attribute)
                     self.prefiltercolumns.append(attribute)
-                    if self.table != 'log' and attribute == 'host_name':
+                    if self.table != 'log' and attribute == 'host_name' and operator == "=":
                         self.quick_host_filter.append(reference)
-                    elif self.table != 'log' and attribute == 'description':
+                    elif self.table != 'log' and attribute == 'description' and operator == "=":
                         self.quick_service_filter.append(reference)
+            
                     else:
                         self.filter_stack.put_stack(self.make_filter(operator, attribute, reference))
                     if self.table == 'log':
@@ -363,6 +365,7 @@ class LiveStatusQuery(object):
             
         return result
 
+
     def gen_filtered(self, values, filterfunc):
         for val in values:
             if filterfunc(val):
@@ -378,6 +381,7 @@ class LiveStatusQuery(object):
             else:
                 yield val
                 loopcnt += 1
+        return
 
     def gen_allhost(self, values, ref):
         for h in ref:
@@ -392,6 +396,7 @@ class LiveStatusQuery(object):
                 for s in self.quick_service_filter:
                     if s in values[h]:
                         yield values[h][s]
+        return
 
     def get_hosts_or_services_livedata(self, cs):
         items = getattr(self.datamgr.rg, self.table).__itersorted__(cs.authuser)
@@ -404,21 +409,12 @@ class LiveStatusQuery(object):
                 mydict[i.host_name][i.service_description] = i
             items = self.gen_host_serv(mydict)
         elif len(self.quick_host_filter) > 0:
-            mydict = {}
-            for i in items:
-                if i.host_name in mydict:
-                    mydict[i.host_name].append(i)
-                else:
-                    mydict[i.host_name] = [i]
+            mydict = dict((k,tuple(v)) for k,v in groupby(items, lambda x: x.host_name))
             items = self.gen_allhost(mydict, self.quick_host_filter)
         elif len(self.quick_service_filter) > 0:
-            mydict = {}
-            for i in items:
-                if i.service_description in mydict:
-                    mydict[i.service_description].append(i)
-                else:
-                    mydict[i.service_description] = [i]
+            mydict = dict((k,tuple(v)) for k,v in groupby(items, lambda x: x.service_description))
             items = self.gen_allhost(mydict, self.quick_service_filter)
+
         if not cs.without_filter:
             items = self.gen_filtered(items, cs.filter_func)
         if self.limit:
