@@ -82,6 +82,7 @@ HINT_NONE = 0
 HINT_SINGLE_HOST = 1
 HINT_SINGLE_HOST_SERVICES = 2
 HINT_SINGLE_SERVICE = 3
+HINT_MULTIPLE_SERVICES = 4
 
 
 class LiveStatusQueryMetainfoFilterStack(LiveStatusStack):
@@ -369,3 +370,12 @@ class LiveStatusQueryMetainfo(object):
                 self.query_hints['host_name'] = [f[3] for f in self.structured_data if (f[0] == 'Filter' and f[1] == 'host_name' and f[2] == '=')][0]
                 self.query_hints['service_description'] = [f[3] for f in self.structured_data if (f[0] == 'Filter' and f[1].endswith('description') and f[2] == '=')][0]
                 # this helps: multisite_service_detail, thruk_service_detail, nagvis_service_icon
+            elif set(['description', 'host_name']).issubset(eq_filters) or set(['host_name', 'service_description']).issubset(eq_fi$
+                self.query_hints['target'] = HINT_MULTIPLE_SERVICES
+                self.query_hints['services'] = []
+                for i, f in enumerate(self.structured_data):
+                    if f[0] == 'Filter' and f[1] == 'host_name' and f[2] == '=':
+                        host_name = f[3]
+                        f = self.structured_data[i + 1]
+                        if f[0] == 'Filter' and f[1].endswith('description') and f[2] == '=':
+                            service = f[3]

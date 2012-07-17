@@ -28,7 +28,7 @@ from shinken.objects import Contact
 from shinken.objects import NotificationWay
 from shinken.misc.regenerator import Regenerator
 from shinken.util import safe_print, get_obj_full_name
-from livestatus_query_metainfo import HINT_NONE, HINT_SINGLE_HOST, HINT_SINGLE_HOST_SERVICES, HINT_SINGLE_SERVICE
+from livestatus_query_metainfo import HINT_NONE, HINT_SINGLE_HOST, HINT_SINGLE_HOST_SERVICES, HINT_SINGLE_SERVICE, HINT_MULTIPLE_SERVICES
 
 
 def itersorted(self, hints=None):
@@ -67,6 +67,17 @@ def itersorted(self, hints=None):
                 yield self.items[service_id]
             elif 'authuser' not in hints:
                 yield self.items[service_id]
+        except Exception:
+            # This service is unknown
+            pass
+    elif hints['target'] == HINT_MULTIPLE_SERVICES:
+        try:
+            for service in hints['services']:
+                service_id = self._id_by_service_name_heap[service]
+                if 'authuser' in hints and service_id in self._id_contact_heap[hints['authuser']]:
+                    yield self.items[service_id]
+                elif 'authuser' not in hints:
+                    yield self.items[service_id]
         except Exception:
             # This service is unknown
             pass
