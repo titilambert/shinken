@@ -1165,6 +1165,7 @@ class Snmp_poller(BaseModule):
             if os.path.isfile(self.datasource_file):
                 self.datasource = ConfigObj(self.datasource_file,
                                         interpolation='template')
+                logger.info("[SnmpBooster] Reading input configuration file: %s" % self.datasource_file)
 
             # if directory
             elif os.path.isdir(self.datasource_file):
@@ -1179,6 +1180,7 @@ class Snmp_poller(BaseModule):
                     else:
                         ctemp = ConfigObj(f, interpolation='template')
                         self.datasource.merge(ctemp)
+                        logger.info("[SnmpBooster] Reading input configuration file: %s" % f)
             else:
                 raise IOError, "File or folder not found: %s" % self.datasource_file
             # Store config in memcache
@@ -1186,11 +1188,11 @@ class Snmp_poller(BaseModule):
         # TODO
         # raise if reading error
         except Exception, e:
-            logger.error("[SnmpBooster] Reading datasource file error: `%s'" % str(e))
+            logger.error("[SnmpBooster] Datasource error while reading or merging : `%s'" % str(e))
             # Try to get it from memcache
             self.datasource = self.memcached.get('datasource')
             if self.datasource is None:
-                logger.error("[SnmpBooster] Datasource not found in your hard disk and in memcached")
+                logger.error("[SnmpBooster] Datasource file not found in your hard disk and in memcached. Get it from the SnmpBooster distribution or consult the shinken wiki")
                 self.i_am_dying = True
                 return
 
