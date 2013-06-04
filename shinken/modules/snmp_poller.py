@@ -627,7 +627,7 @@ class SNMPOid(object):
 
                 self.value = float(self.value)
                 self.out = "%(name)s: %(value)0.2f%(unit)s" % self.__dict__
-                self.perf = "%(name)s=%(value)0.2f%(unit)s;;%(min_)s;%(max_)s" % self.__dict__
+                self.perf = "%(name)s=%(value)0.2f%(unit)s;;;%(min_)s;%(max_)s" % self.__dict__
 
     def format_counter64_output(self, check_time, old_check_time):
         """ Format output for counter64 type
